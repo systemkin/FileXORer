@@ -16,7 +16,6 @@ MainWindow::MainWindow(QWidget *parent)
     this->ui->ContinuePushButton->setDisabled(true);
     this->ui->PausePushButton->setDisabled(true);
     this->ui->TerminatePushButton->setDisabled(true);
-    connect(this, &MainWindow::end, this, &MainWindow::onEnd);
     connect(&restartTimer, &QTimer::timeout, this,  &MainWindow::start);
     restartTimer.setSingleShot(true);
     statusBarTimer.setInterval(1000);
@@ -30,9 +29,9 @@ MainWindow::MainWindow(QWidget *parent)
     QRegularExpressionValidator *validatorHex = new QRegularExpressionValidator(rxHex, this);
     this->ui->FunctionLine->setValidator(validatorHex);
 
-    fw = new FileWorker(this, &pauseMutex, &pauseCondition);
+    fw = new FileWorker(&pauseMutex, &pauseCondition);
     connect(fw, &FileWorker::end, this, &MainWindow::onEnd);
-    connect(fw, &FileWorker::failToDelete, this, &MainWindow::onErrorDeleteFile);
+    connect(fw, &FileWorker::unspecifiedError, this, &MainWindow::onError);
 }
 
 MainWindow::~MainWindow()
@@ -45,8 +44,6 @@ void MainWindow::on_StartPushButton_clicked()
 {
     if (validate()) {
         this->ui->StartPushButton->setDisabled(true);
-        globalRunsCounter = 0;
-        waitingForRestart = false;
         start();
     }
 }
@@ -95,7 +92,6 @@ void MainWindow::on_ResultFilesPathPushButton_clicked()
 void MainWindow::onEnd() {
     statusBarTimer.stop();
     if (this->ui->RestartCheckBox->isChecked()) {
-        waitingForRestart = true;
         this->statusBar()->showMessage(QString("Done %1 run! Waiting for restart...").arg(globalRunsCounter++));
         restartTimer.setInterval(timer*1000);
         restartTimer.start();
@@ -198,6 +194,12 @@ bool MainWindow::validate() {
             return false;
         }
     }
+    if (this->ui->RestartCheckBox->isChecked())
+        waitingForRestart = true;
+    else
+        waitingForRestart = false;
+
+    globalRunsCounter = 0;
 
     this->statusBar()->showMessage("All checks passed");
     return true;
@@ -222,24 +224,24 @@ void MainWindow::renewStatusBar() {
 }
 void MainWindow::closeEvent(QCloseEvent *event) {
 
-    fw->abort(true);
+    fw->abort();
     pauseCondition.wakeAll();
     event->accept();
 }
-void MainWindow::onErrorDeleteFile(QString error) {
-    QMessageBox::information(this, "Error", QString("Can't delete file\n%1").arg(error));
+void MainWindow::onError(QString error) {
+    QMessageBox::information(this, "Error", error);
 }
 
 
 void MainWindow::on_TerminatePushButton_clicked()
 {
-    fw->abort(true);
+    fw->abort();
     pauseCondition.wakeAll();
     delete fw;
 
-    fw = new FileWorker(this, &pauseMutex, &pauseCondition);
+    fw = new FileWorker(&pauseMutex, &pauseCondition);
     connect(fw, &FileWorker::end, this, &MainWindow::onEnd);
-    connect(fw, &FileWorker::failToDelete, this, &MainWindow::onErrorDeleteFile);
+    connect(fw, &FileWorker::unspecifiedError, this, &MainWindow::onError);
 
     this->ui->inputWidget->setEnabled(true);
     this->ui->StartPushButton->setEnabled(true);
