@@ -1,6 +1,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "fileworker.h"
+
 #include <QMainWindow>
 #include <QWaitCondition>
 #include <QMutex>
@@ -15,18 +17,7 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-namespace WorkModes {
-    enum CollisionResolveModes {
-        Rewrite = 0,
-        Append,
-        Ignore,
-    };
-    enum FilterModes {
-        FileType = 0,
-        FileName,
-        NoFilter,
-    };
-}
+
 
 class MainWindow : public QMainWindow
 {
@@ -37,32 +28,37 @@ public:
     ~MainWindow();
 
 signals:
-
-    void start();
-
     void end();
 
 private slots:
 
-    int on_StartButton_clicked();
+    void start();
+
+    void on_StartPushButton_clicked();
 
     void on_SourceFilesPathPushButton_clicked();
 
     void on_ResultFilesPathPushButton_clicked();
 
-    int onStart();
-
     void onEnd();
 
-    void on_StopPushButton_clicked();
+    void on_PausePushButton_clicked();
 
-    void on_ContinueButton_clicked();
+    void on_ContinuePushButton_clicked();
 
     void renewStatusBar();
 
+    void onErrorDeleteFile(QString error);
+
+    void on_TerminatePushButton_clicked();
+
 private:
 
+    bool validate();
+
     Ui::MainWindow *ui;
+
+    bool waitingForRestart = false;
 
     QString mask="";
 
@@ -76,28 +72,18 @@ private:
 
     WorkModes::FilterModes filterMode;
 
-    int doFile(QString &sourcePath, QString &destinationPath);
-
-    int filesAmnt = 0;
-    int currFileNum = 0;
 
     long long timer;
     QMutex pauseMutex;
     QWaitCondition pauseCondition;
-    bool paused = false;
-    bool waitingForRestart = false;
 
     QTimer restartTimer;
     QTimer statusBarTimer;
 
-    QList<QFuture<void>> futures;
-    QFutureWatcher<void> futureWatcher;
-    QMap<QString, QPair<long long, long long>> results;
-
     long long globalRunsCounter = 0;
 
-    bool aborting = false;
-
     void closeEvent(QCloseEvent *event) override;
+
+    FileWorker *fw;
 };
 #endif // MAINWINDOW_H
