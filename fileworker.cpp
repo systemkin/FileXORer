@@ -71,11 +71,6 @@ bool FileWorker::doFile(QString &sourcePath, QString &destinationPath, QString &
         emit unspecifiedError(QString("Can't open file %1").arg(sourcePath));
         return false;
     }
-    if (sfile->size() % 8 != 0) {
-        emit unspecifiedError(QString("File %1 is not 8-sized").arg(sourcePath));
-        sfile->close();
-        return false;
-    }
 
     QFile *dfile = new QFile(destinationPath);
     if (resolveMode == WorkModes::CollisionResolveModes::Rewrite) {
@@ -121,7 +116,6 @@ bool FileWorker::doFile(QString &sourcePath, QString &destinationPath, QString &
         QDataStream destinationStream(dfile);
         std::vector<char> buf(8);
         qint64 size = 8;
-        char pos = 0;
         uint16_t cnt = 0;
         while (!sourceStream.atEnd() && (!aborting)) {
 
@@ -137,23 +131,23 @@ bool FileWorker::doFile(QString &sourcePath, QString &destinationPath, QString &
                 }
             }
 
-            if (cnt == 1024) {
-                progress += cnt*8;
-                cnt = 0;
-                dfile->flush();
-            }
-            sourceStream.readRawData(buf.data(), size);
-            QString hexRepresentation = QString(function.mid(pos, 16));
-            uint64_t byteFunc = qbswap(hexRepresentation.toULongLong(nullptr, 16));
 
+            int readed = sourceStream.readRawData(buf.data(), size);
+            QString hexRepresentation = QString(function.mid(0, readed*2));
+            uint64_t byteFunc = qbswap(hexRepresentation.toULongLong(nullptr, 16));
+            byteFunc = byteFunc >> (8-readed)*8;
             uint64_t byteFile = 0;
-            memcpy(&byteFile, buf.data(), sizeof(char)*8);
+            memcpy(&byteFile, buf.data(), sizeof(char)*readed);
 
             uint64_t byteXOR = byteFunc ^ byteFile;
 
-            destinationStream.writeRawData((char*) &byteXOR, size);
-            pos = (pos+16)%16;
+            destinationStream.writeRawData((char*) &byteXOR, readed);
             cnt++;
+            progress += readed;
+            if (cnt == 1024) {
+                cnt = 0;
+                dfile->flush();
+            }
         }
         dfile->close();
         if(needToDelete) {
