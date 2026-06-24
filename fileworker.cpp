@@ -1,5 +1,4 @@
 #include "fileworker.h"
-#include "mainwindow.h"
 
 #include <QStatusBar>
 #include <QRegularExpression>
@@ -13,8 +12,10 @@ FileWorker::FileWorker(QMutex *pauseMutex,QWaitCondition *pauseCondition, QObjec
 
 bool FileWorker::start(QString &sourcePath, QString &resultPath, QString &mask, QString &function, bool needToDelete, WorkModes::FilterModes &filterMode, WorkModes::CollisionResolveModes &resolveMode) {
 
-    disconnect(&futureWatcher, &QFutureWatcher<void>::finished, this, &FileWorker::end);
+    futureWatchers.clear();
     futures.clear();
+    totalFiles = 0;
+    finishedFiles = 0;
 
     QDir sourceDir(sourcePath);
     QDir resultDir(resultPath);
@@ -47,18 +48,13 @@ bool FileWorker::start(QString &sourcePath, QString &resultPath, QString &mask, 
         sourceFiles = sourceDir.entryList();
     }
 
+    totalFiles = sourceFiles.size();
     for (auto it = sourceFiles.begin(); it != sourceFiles.end(); ++it) {
         QString sFilepath = sourceDir.absoluteFilePath(*it);
         QString rFilePath = resultDir.absoluteFilePath(*it);
         doFile(sFilepath, rFilePath, function, needToDelete, resolveMode);
     }
 
-    if (!futures.isEmpty()) {
-        futureWatcher.setFuture(futures.last());
-        connect(&futureWatcher, &QFutureWatcher<void>::finished, this, &FileWorker::end);
-    } else {
-        emit end();
-    }
 
     return false;
 }
@@ -163,6 +159,16 @@ bool FileWorker::doFile(QString &sourcePath, QString &destinationPath, QString &
         delete sfile;
     });
     futures.append(future);
+    std::unique_ptr<QFutureWatcher<void>> watcher = std::make_unique<QFutureWatcher<void>> ();
+    futureWatchers.emplace_back(std::move(watcher));
+    futureWatchers.back()->setFuture(futures.last());
+
+    connect(futureWatchers.back().get(), &QFutureWatcher<void>::finished, this, [this](){
+        finishedFiles++;
+        if (totalFiles == finishedFiles) {
+            emit end();
+        }
+    });
     return 1;
 }
 void FileWorker::pause(bool pause) {

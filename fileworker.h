@@ -104,7 +104,7 @@ private:
      * \brief Для отслеживаеня прогресса выполнения
      */
     QList<QFuture<void>> futures;
-    QFutureWatcher<void> futureWatcher;
+    std::vector<std::unique_ptr<QFutureWatcher<void>>> futureWatchers;
 
     /*!
      * \brief Для постановки-снятия с паузы
@@ -126,6 +126,12 @@ private:
      * \brief Число байт в обработке
      */
     std::atomic<long long> filesSize{0};
+
+    /*!
+     * \brief Отслеживание процесса обработки по числу файлов
+     */
+    int totalFiles = 0;
+    int finishedFiles = 0;
 
 };
 
