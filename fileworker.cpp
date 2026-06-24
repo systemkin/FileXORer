@@ -10,6 +10,13 @@ FileWorker::FileWorker(QMutex *pauseMutex,QWaitCondition *pauseCondition, QObjec
     pauseCondition{pauseCondition}
 {}
 
+FileWorker::~FileWorker(){
+    aborting = true;
+    for (auto it = futureWatchers.begin(); it != futureWatchers.end(); ++it) {
+        it->get()->waitForFinished();
+    }
+}
+
 bool FileWorker::start(QString &sourcePath, QString &resultPath, QString &mask, QString &function, bool needToDelete, WorkModes::FilterModes &filterMode, WorkModes::CollisionResolveModes &resolveMode) {
 
     futureWatchers.clear();

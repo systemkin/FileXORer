@@ -38,6 +38,7 @@ public:
      */
     FileWorker(QMutex *pauseMutex, QWaitCondition *pauseCondition, QObject *parent = nullptr);
 
+    ~FileWorker();
     //!
     //! \brief Функция для получения процента выполнения текущих запущенных задач
     //! \return Процент выполнения
