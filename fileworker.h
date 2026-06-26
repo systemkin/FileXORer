@@ -132,7 +132,7 @@ private:
      * \brief Отслеживание процесса обработки по числу файлов
      */
     int totalFiles = 0;
-    int finishedFiles = 0;
+    std::atomic<int> finishedFiles{0};
 
 };
 
